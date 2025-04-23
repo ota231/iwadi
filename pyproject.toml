@@ -1,0 +1,22 @@
+[project]
+name = "iwadi"
+version = "0.1.0"
+description = "Command-line research assistant for computer science"
+authors = [{ name = "Tomisin Adeyemi", email = "tomisinadeyemi7@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+
+[project.scripts]
+iwadi = "src.cli.main:app"  #src/cli/main.py contains your CLI app
+
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false # not using namespace packages
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.md", "*.txt"]  # include non-Python files
