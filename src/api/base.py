@@ -21,9 +21,11 @@ class Paper:
 class Citation:
     id: str
     title: str
+    citation_format: str
+    citation_str: str
     authors: List[str]
     year: Optional[int] = None
-    venue: Optional[str] = None
+    source: Optional[str] = None
     url: Optional[str] = None
 
 
@@ -33,8 +35,8 @@ class ResearchAPI(ABC):
         self,
         query: str,
         limit: int,
-        before: date,
-        after: date,
+        before: Optional[date],
+        after: Optional[date],
         author: str,
         sort: bool,
     ) -> List[Paper]:
@@ -45,7 +47,7 @@ class ResearchAPI(ABC):
     def download_paper(self, paper_id: str) -> Optional[Paper]:
         """
         Download a paper given its ID.
-        
+
         Args:
             paper_id: ID of the paper to download.
 
@@ -55,10 +57,10 @@ class ResearchAPI(ABC):
         pass
 
     @abstractmethod
-    def get_citations(self, paper_id: str, format: int) -> List[str]:
+    def get_citation(self, paper_id: str, format: int) -> Citation:
         """
         Retrieve a list of citations for a given paper.
-        
+
         Args:
             paper_id: ID of the paper to retrieve citations for.
             format: Citation format preference (e.g., 0 = minimal, 1 = full).

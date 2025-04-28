@@ -30,3 +30,8 @@ pip install -e .
 ```bash
 pip freeze | Out-File -Encoding utf8 requirements.txt
 ```
+
+### formatting and linting
+```bash
+ruff format && ruff check . && mypy .
+```
