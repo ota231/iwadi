@@ -33,5 +33,6 @@ pip freeze | Out-File -Encoding utf8 requirements.txt
 
 ### formatting and linting
 ```bash
-ruff format && ruff check . && mypy .
+make build
 ```
+runs: `ruff format && ruff check . && mypy .`
