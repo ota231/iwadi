@@ -7,4 +7,7 @@ check:
 	ruff check .
 	mypy .
 
-build: format check
+test:
+	PYTHONPATH=src pytest
+
+build: format check test
