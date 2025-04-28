@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import date
 from abc import ABC, abstractmethod
 
@@ -57,7 +57,7 @@ class ResearchAPI(ABC):
         pass
 
     @abstractmethod
-    def get_citation(self, paper_id: str, format: int) -> Citation:
+    def get_citation(self, paper_id: str, format: int) -> Union[Citation, None]:
         """
         Retrieve a list of citations for a given paper.
 
