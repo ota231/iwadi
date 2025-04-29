@@ -1,5 +1,5 @@
 from .base_api import ResearchAPI, Paper, Citation
-from xploreapi import Xplore
+from .xploreapi import Xplore
 from typing import List, Optional, Union
 from datetime import date
 import os

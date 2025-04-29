@@ -47,7 +47,7 @@ class ArxivAPI(ResearchAPI):
                 title=result.title,
                 authors=[a.name for a in result.authors],
                 abstract=result.summary,
-                published=result.published.date(),
+                publication_date=result.published.date(),
                 pdf_url=result.pdf_url,
                 source="arXiv",
             )

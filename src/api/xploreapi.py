@@ -12,7 +12,7 @@ import certifi
 from io import BytesIO
 
 
-class XPLORE:
+class Xplore:
     # default API endpoint (used for most queries)
     endPoint = "https://ieeexploreapi.ieee.org/api/v1/search/articles"
 

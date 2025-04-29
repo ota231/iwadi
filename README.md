@@ -12,23 +12,23 @@ A command-line tool for managing academic papers with AI-powered search, organiz
 - Python 3.8+
 - pip 20.3+
 
-### Windows (PowerShell)
-```powershell
-python -m venv .venv # only needed once
-.venv\Scripts\activate # run each time
 
-pip install -e . # only when dependencies change/new .venv
-```
 ### macOS/Linux
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+python3 -m venv .venv # only needed once
+source .venv/bin/activate # run each time
+pip install -e . # not sure how often this should be
+
 ```
 
-### proper encoding with requirements.txt
+### install requirements
 ```bash
-pip freeze | Out-File -Encoding utf8 requirements.txt
+pip install -r requirements.txt
+```
+
+### updating requirements.txt
+```bash
+pip freeze > requirements.txt
 ```
 
 ### formatting and linting
