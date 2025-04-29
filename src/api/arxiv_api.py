@@ -1,14 +1,59 @@
-# mypy: ignore-errors
 from datetime import date
 from typing import List, Optional
 import arxiv
-
 from .base_api import ResearchAPI, Paper, Citation
+from .base_api_error import (  # Assuming you've created this
+    APIRequestError,
+    APIResponseError,
+    APIServiceError,
+    APIErrorDetail,
+)
 
 
 class ArxivAPI(ResearchAPI):
-    def __init__(self) -> None:
+    def __init__(self, max_retries: int = 3) -> None:
         self.client = arxiv.Client()
+        self.max_retries = max_retries
+
+    def _handle_arxiv_error(self, error: Exception) -> None:
+        """Map arXiv-specific errors to our standard error types."""
+        if isinstance(error, arxiv.HTTPError):
+            raise APIRequestError(
+                message=f"arXiv API request failed with HTTP {error.status}",
+                status_code=error.status,
+                source="arxiv",
+                details=APIErrorDetail(
+                    code="arxiv:http_error",
+                    retryable=error.retry < self.max_retries,
+                    metadata={"url": error.url, "retry_attempt": error.retry},
+                ),
+            ) from error
+        elif isinstance(error, arxiv.UnexpectedEmptyPageError):
+            raise APIServiceError(
+                message="arXiv API returned empty page unexpectedly",
+                source="arxiv",
+                details=APIErrorDetail(
+                    code="arxiv:empty_page",
+                    retryable=True,
+                    metadata={"url": error.url, "retry_attempt": error.retry},
+                ),
+            ) from error
+        elif isinstance(error, arxiv.Result.MissingFieldError):
+            raise APIResponseError(
+                message=f"Missing required field in arXiv response: {error.missing_field}",
+                source="arxiv",
+                details=APIErrorDetail(
+                    code="arxiv:missing_field",
+                    retryable=False,
+                    metadata={"missing_field": error.missing_field},
+                ),
+            ) from error
+        # Fallback for other arXiv errors
+        raise APIRequestError(
+            message=str(error),
+            source="arxiv",
+            details=APIErrorDetail(code="arxiv:unknown_error", retryable=False),
+        ) from error
 
     def search(
         self,
@@ -19,99 +64,146 @@ class ArxivAPI(ResearchAPI):
         author: str = "",
         sort: bool = True,
     ) -> List[Paper]:
-        # Construct arXiv query string with optional filters
-        query_parts = [query]
+        try:
+            query_parts = [query]
+            if author:
+                query_parts.append(f"au:{author}")
+            if before:
+                query_parts.append(f"submittedDate:[* TO {before.isoformat()}]")
+            if after:
+                query_parts.append(f"submittedDate:[{after.isoformat()} TO *]")
 
-        if author:
-            query_parts.append(f"au:{author}")
-        if before:
-            query_parts.append(f"submittedDate:[* TO {before.isoformat()}]")
-        if after:
-            query_parts.append(f"submittedDate:[{after.isoformat()} TO *]")
-
-        full_query = " AND ".join(query_parts)
-
-        search = arxiv.Search(
-            query=full_query,
-            max_results=limit,
-            sort_by=arxiv.SortCriterion.Relevance
-            if sort
-            else arxiv.SortCriterion.SubmittedDate,
-            sort_order=arxiv.SortOrder.Descending,
-        )
-
-        results = []
-        for result in self.client.results(search):
-            paper = Paper(
-                id=result.entry_id,
-                title=result.title,
-                authors=[a.name for a in result.authors],
-                abstract=result.summary,
-                publication_date=result.published.date(),
-                pdf_url=result.pdf_url,
-                source="arXiv",
+            search = arxiv.Search(
+                query=" AND ".join(query_parts),
+                max_results=limit,
+                sort_by=arxiv.SortCriterion.Relevance
+                if sort
+                else arxiv.SortCriterion.SubmittedDate,
+                sort_order=arxiv.SortOrder.Descending,
             )
-            results.append(paper)
 
-        return results
+            results = []
+            for result in self.client.results(search):
+                try:
+                    results.append(
+                        Paper(
+                            id=result.entry_id,
+                            title=result.title,
+                            authors=[a.name for a in result.authors],
+                            abstract=result.summary,
+                            publication_date=result.published.date(),
+                            pdf_url=result.pdf_url,
+                            source="arXiv",
+                        )
+                    )
+                except AttributeError as e:
+                    raise APIResponseError(
+                        message="Invalid arXiv result structure",
+                        source="arxiv",
+                        details=APIErrorDetail(
+                            code="arxiv:invalid_result",
+                            retryable=False,
+                            metadata={"exception": str(e)},
+                        ),
+                    ) from e
+
+            if not results:
+                raise APIResponseError(
+                    message="No results found for query",
+                    source="arxiv",
+                    details=APIErrorDetail(code="arxiv:no_results", retryable=True),
+                )
+
+            return results
+        except Exception as e:
+            self._handle_arxiv_error(e)
+            raise
 
     def get_citation(self, paper_id: str, format: int = 0) -> Citation:
-        """
-        Retrieve a formatted Citation object for a given paper ID.
+        try:
+            search = arxiv.Search(id_list=[paper_id])
+            try:
+                paper = next(self.client.results(search))
+            except StopIteration:
+                raise APIResponseError(
+                    message=f"No paper found with ID: {paper_id}",
+                    source="arxiv",
+                    details=APIErrorDetail(
+                        code="arxiv:paper_not_found", retryable=False
+                    ),
+                )
 
-        Args:
-            paper_id: The arXiv ID of the paper.
-            format: Citation format preference (0 = MLA, 1 = APA, 2 = Chicago).
+            try:
+                authors = [author.name for author in paper.authors]
+                year = paper.published.year
+                title = paper.title
+                url = paper.entry_id
+            except AttributeError as e:
+                raise APIResponseError(
+                    message="Missing required fields in arXiv paper",
+                    source="arxiv",
+                    details=APIErrorDetail(
+                        code="arxiv:missing_fields",
+                        retryable=False,
+                        metadata={"missing_fields": str(e)},
+                    ),
+                )
 
-        Returns:
-            A list with one Citation object.
-        """
-        search = arxiv.Search(id_list=[paper_id])
-        paper = next(self.client.results(search))
+            # Citation formatting remains the same
+            if format == 0:  # MLA
+                citation_format = "MLA"
+                citation_str = f'{", ".join(authors)}. "{title}." arXiv, {year}, {url}.'
+            elif format == 1:  # APA
+                citation_format = "APA"
+                citation_str = f"{', '.join(authors)} ({year}). {title}. arXiv. {url}"
+            elif format == 2:  # Chicago
+                citation_format = "Chicago"
+                citation_str = (
+                    f'{", ".join(authors)}. "{title}." arXiv ({year}). {url}.'
+                )
+            else:
+                citation_format = "Unknown"
+                citation_str = f"{', '.join(authors)}. {title} ({year}). {url}"
 
-        authors = [author.name for author in paper.authors]
-        year = paper.published.year
-        title = paper.title
-        url = paper.entry_id
-
-        # Format the citation string based on format choice
-        if format == 0:  # MLA
-            citation_format = "MLA"
-            author_str = ", ".join(authors)
-            citation_str = f'{author_str}. "{title}." arXiv, {year}, {url}.'
-        elif format == 1:  # APA
-            citation_format = "APA"
-            author_str = ", ".join(authors)
-            citation_str = f"{author_str} ({year}). {title}. arXiv. {url}"
-        elif format == 2:  # Chicago
-            citation_format = "Chicago"
-            author_str = ", ".join(authors)
-            citation_str = f'{author_str}. "{title}." arXiv ({year}). {url}.'
-        else:
-            citation_format = "Unknown"
-            citation_str = f"{', '.join(authors)}. {title} ({year}). {url}"
-
-        citation = Citation(
-            id=paper.entry_id,
-            title=paper.title,
-            citation_format=citation_format,
-            citation_str=citation_str,
-            authors=authors,
-            year=year,
-            source="arXiv",
-            url=url,
-        )
-
-        return citation
+            return Citation(
+                id=paper.entry_id,
+                title=title,
+                citation_format=citation_format,
+                citation_str=citation_str,
+                authors=authors,
+                year=year,
+                source="arXiv",
+                url=url,
+            )
+        except Exception as e:
+            self._handle_arxiv_error(e)
+            raise
 
     def download_paper(self, paper_id: str, dirpath: str = ".") -> None:
-        """
-        Download the PDF of a paper given its arXiv ID.
+        try:
+            search = arxiv.Search(id_list=[paper_id])
+            try:
+                paper = next(self.client.results(search))
+            except StopIteration:
+                raise APIResponseError(
+                    message=f"No paper found with ID: {paper_id}",
+                    source="arxiv",
+                    details=APIErrorDetail(
+                        code="arxiv:paper_not_found", retryable=False
+                    ),
+                )
 
-        Args:
-            paper_id: The arXiv ID of the paper.
-            dirpath: Directory path to download the paper into (default current directory).
-            filename: Custom filename (optional).
-        """
-        paper = next(self.client.results(arxiv.Search(id_list=[paper_id])))
-        paper.download_pdf(dirpath=dirpath, filename=paper.title)
+            try:
+                paper.download_pdf(dirpath=dirpath, filename=paper.title)
+            except Exception as e:
+                raise APIRequestError(
+                    message=f"Failed to download paper {paper_id}",
+                    source="arxiv",
+                    details=APIErrorDetail(
+                        code="arxiv:download_failed",
+                        retryable=True,
+                        metadata={"exception": str(e)},
+                    ),
+                ) from e
+        except Exception as e:
+            self._handle_arxiv_error(e)
