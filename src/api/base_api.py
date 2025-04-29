@@ -44,12 +44,15 @@ class ResearchAPI(ABC):
         pass
 
     @abstractmethod
-    def download_paper(self, paper_id: str) -> Optional[Paper]:
+    def download_paper(
+        self, paper_id: str, dirpath: str = ".", filename: Optional[str] = None
+    ) -> None:
         """
         Download a paper given its ID.
 
         Args:
             paper_id: ID of the paper to download.
+            dirpath: Directory path to save the downloaded paper.
 
         Returns:
             A Paper object with the downloaded content.

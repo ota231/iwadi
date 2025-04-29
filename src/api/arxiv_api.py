@@ -54,6 +54,7 @@ class ArxivAPI(ResearchAPI):
                 ),
             ) from error
         # check for custom errors
+        # TODO: Add proper logic for quota and auth errors
         elif isinstance(
             error,
             (
@@ -199,7 +200,9 @@ class ArxivAPI(ResearchAPI):
             self._handle_arxiv_error(e)
             raise
 
-    def download_paper(self, paper_id: str, dirpath: str = ".") -> None:
+    def download_paper(
+        self, paper_id: str, dirpath: str = ".", filename: Optional[str] = None
+    ) -> None:
         try:
             search = arxiv.Search(id_list=[paper_id])
             try:
@@ -214,7 +217,7 @@ class ArxivAPI(ResearchAPI):
                 )
 
             try:
-                paper.download_pdf(dirpath=dirpath, filename=paper.title)
+                paper.download_pdf(dirpath=dirpath, filename=filename or paper.title)
             except Exception as e:
                 raise APIRequestError(
                     message=f"Failed to download paper {paper_id}",
