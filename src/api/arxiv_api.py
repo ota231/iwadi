@@ -2,11 +2,13 @@ from datetime import date
 from typing import List, Optional
 import arxiv
 from .base_api import ResearchAPI, Paper, Citation
-from .base_api_error import (  # Assuming you've created this
+from .base_api_error import (
     APIRequestError,
     APIResponseError,
     APIServiceError,
     APIErrorDetail,
+    APIAuthError,
+    APIQuotaError,
 )
 
 
@@ -25,7 +27,10 @@ class ArxivAPI(ResearchAPI):
                 details=APIErrorDetail(
                     code="arxiv:http_error",
                     retryable=error.retry < self.max_retries,
-                    metadata={"url": error.url, "retry_attempt": error.retry},
+                    metadata={
+                        "url": error.url,
+                        "retry_attempt": error.retry,
+                    },
                 ),
             ) from error
         elif isinstance(error, arxiv.UnexpectedEmptyPageError):
@@ -48,7 +53,19 @@ class ArxivAPI(ResearchAPI):
                     metadata={"missing_field": error.missing_field},
                 ),
             ) from error
-        # Fallback for other arXiv errors
+        # check for custom errors
+        elif isinstance(
+            error,
+            (
+                APIRequestError,
+                APIAuthError,
+                APIQuotaError,
+                APIResponseError,
+                APIServiceError,
+            ),
+        ):
+            raise  # Re-raise unchanged
+        # Fallback for truly unexpected errors
         raise APIRequestError(
             message=str(error),
             source="arxiv",
@@ -82,8 +99,11 @@ class ArxivAPI(ResearchAPI):
                 sort_order=arxiv.SortOrder.Descending,
             )
 
+            # obtain results before processing to make error catching easier
+            raw_results = list(self.client.results(search))
+
             results = []
-            for result in self.client.results(search):
+            for result in raw_results:
                 try:
                     results.append(
                         Paper(

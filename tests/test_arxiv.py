@@ -1,74 +1,174 @@
 import pytest
+import arxiv
+from unittest.mock import MagicMock, patch
 from datetime import date
-from unittest.mock import patch, MagicMock
 from src.api.arxiv_api import ArxivAPI
-from itertools import islice
+from src.api.base_api_error import APIResponseError, APIRequestError, APIServiceError
 
 
-@pytest.fixture
-def arxiv_api() -> ArxivAPI:
-    return ArxivAPI()
+class TestArxivAPI:
+    @pytest.fixture
+    def arxiv_api(self) -> ArxivAPI:
+        return ArxivAPI()
 
+    def test_search_success(self, arxiv_api: ArxivAPI) -> None:
+        """Test successful search with mock results"""
+        mock_paper = MagicMock()
+        mock_paper.entry_id = "1234.5678"
+        mock_paper.title = "Test Paper"
+        mock_paper.authors = [
+            type("Author", (), {"name": "Author One"}),
+            type("Author", (), {"name": "Author Two"}),
+        ]
+        mock_paper.summary = "Test abstract"
+        mock_paper.published.date.return_value = date(2023, 1, 1)
+        mock_paper.pdf_url = "http://test.url/pdf"
 
-def test_search(arxiv_api: ArxivAPI) -> None:
-    with patch.object(arxiv_api.client, "results") as mock_results:
-        author_one = MagicMock()
-        author_one.name = "Author One"
+        with patch.object(arxiv_api.client, "results", return_value=iter([mock_paper])):
+            papers = arxiv_api.search("test query")
 
-        author_two = MagicMock()
-        author_two.name = "Author Two"
+            assert len(papers) == 1
+            paper = papers[0]
+            assert paper.title == "Test Paper"
+            assert paper.authors == ["Author One", "Author Two"]
 
-        mock_result = MagicMock()
-        mock_result.entry_id = "1234.5678"
-        mock_result.title = "Test Paper"
-        mock_result.authors = [author_one, author_two]
-        mock_result.summary = "Test Abstract"
-        mock_result.published.date.return_value = date(2024, 4, 1)
-        mock_result.pdf_url = "http://arxiv.org/pdf/1234.5678.pdf"
+    def test_search_empty_results(self, arxiv_api: ArxivAPI) -> None:
+        """Test empty results handling"""
+        with patch.object(arxiv_api.client, "results", return_value=iter([])):
+            with pytest.raises(APIResponseError) as exc_info:
+                arxiv_api.search("test query")
+            assert "No results found" in str(exc_info.value)
 
-        mock_results.return_value = [mock_result]
+    def test_get_citation_success(self, arxiv_api: ArxivAPI) -> None:
+        """Test citation generation"""
+        mock_paper = MagicMock()
+        mock_paper.entry_id = "1234.5678"
+        mock_paper.title = "Test Paper"
+        mock_paper.authors = [type("Author", (), {"name": "Test Author"})]
+        mock_paper.published.year = 2023
 
-        papers = arxiv_api.search("machine learning", limit=1)
+        with patch.object(arxiv_api.client, "results", return_value=iter([mock_paper])):
+            citation = arxiv_api.get_citation("1234.5678")
+            assert citation.title == "Test Paper"
+            assert "Test Author" in citation.citation_str
 
-        assert len(papers) == 1
-        paper = papers[0]
-        assert paper.title == "Test Paper"
-        assert paper.source == "arXiv"
-        assert paper.authors == ["Author One", "Author Two"]  # Now this will work
+    def test_get_citation_missing_paper(self, arxiv_api: ArxivAPI) -> None:
+        """Test paper not found error"""
+        with patch.object(arxiv_api.client, "results", return_value=iter([])):
+            with pytest.raises(APIResponseError) as exc_info:
+                arxiv_api.get_citation("invalid_id")
+            assert "No paper found" in str(exc_info.value)
 
+    def test_download_paper_success(self, arxiv_api: ArxivAPI, tmp_path: str) -> None:
+        """Test paper download"""
+        mock_paper = MagicMock()
+        mock_paper.title = "Test Paper"
+        mock_paper.download_pdf = MagicMock()
 
-def test_get_citation(arxiv_api: ArxivAPI) -> None:
-    with patch.object(arxiv_api.client, "results") as mock_results:
-        author_one = MagicMock()
-        author_one.name = "Author One"
+        with patch.object(arxiv_api.client, "results", return_value=iter([mock_paper])):
+            arxiv_api.download_paper("1234.5678", dirpath=str(tmp_path))
+            mock_paper.download_pdf.assert_called_once_with(
+                dirpath=str(tmp_path), filename="Test Paper"
+            )
 
-        author_two = MagicMock()
-        author_two.name = "Author Two"
-
-        mock_result = MagicMock()
-        mock_result.entry_id = "1234.5678"
-        mock_result.title = "Test Citation Paper"
-        mock_result.authors = [author_one, author_two]
-        mock_result.published.year = 2024
-
-        mock_results.return_value = islice([mock_result], 1)
-
-        citation = arxiv_api.get_citation("1234.5678")
-
-        assert citation.title == "Test Citation Paper"
-        assert citation.citation_format == "MLA"
-        assert "Author One" in citation.citation_str
-
-
-def test_download_paper(arxiv_api: ArxivAPI, tmp_path: str) -> None:
-    with patch.object(arxiv_api.client, "results") as mock_results:
-        mock_result = MagicMock()
-        mock_result.download_pdf = MagicMock()
-        mock_result.title = "Test Download Paper"
-        mock_results.return_value = islice([mock_result], 1)
-
-        arxiv_api.download_paper("1234.5678", dirpath=str(tmp_path))
-
-        mock_result.download_pdf.assert_called_once_with(
-            dirpath=str(tmp_path), filename="Test Download Paper"
+    def test_http_error_handling(self, arxiv_api: ArxivAPI) -> None:
+        """Test HTTP error propagation"""
+        mock_error = arxiv.HTTPError(
+            url="http://arxiv.org/fail",
+            retry=0,
+            status=404,
         )
+
+        with patch.object(arxiv_api.client, "results", side_effect=mock_error):
+            with pytest.raises(APIRequestError) as exc_info:
+                arxiv_api.search("test query")
+            assert "HTTP 404" in str(exc_info.value)
+
+    def test_search_http_error(self, arxiv_api: ArxivAPI) -> None:
+        """Test HTTP error during search"""
+        mock_error = arxiv.HTTPError(
+            url="http://arxiv.org/fail",
+            retry=0,
+            status=500,
+        )
+
+        with patch.object(arxiv_api.client, "results", side_effect=mock_error):
+            with pytest.raises(APIRequestError) as exc_info:
+                arxiv_api.search("test query")
+            assert "HTTP 500" in str(exc_info.value)
+            assert exc_info.value.details.retryable is True
+
+    def test_search_empty_page_error(self, arxiv_api: ArxivAPI) -> None:
+        """Test unexpected empty page error"""
+        mock_error = arxiv.UnexpectedEmptyPageError(
+            url="http://arxiv.org/empty",
+            retry=1,
+            raw_feed="<feed></feed>",
+        )
+
+        with patch.object(arxiv_api.client, "results", side_effect=mock_error):
+            with pytest.raises(APIServiceError) as exc_info:
+                arxiv_api.search("test query")
+            assert "empty page" in str(exc_info.value).lower()
+            assert exc_info.value.details.retryable is True
+
+    def test_search_missing_field_error(self, arxiv_api: ArxivAPI) -> None:
+        """Test missing required field in response"""
+        mock_error = arxiv.Result.MissingFieldError(
+            missing_field="authors",
+        )
+
+        with patch.object(arxiv_api.client, "results", side_effect=mock_error):
+            with pytest.raises(APIResponseError) as exc_info:
+                arxiv_api.search("test query")
+            assert "authors" in str(exc_info.value)
+            assert exc_info.value.details.retryable is False
+
+    def test_download_paper_paper_not_found(
+        self, arxiv_api: ArxivAPI, tmp_path: str
+    ) -> None:
+        """Test paper not found error during download"""
+        with patch.object(arxiv_api.client, "results", return_value=iter([])):
+            with pytest.raises(APIResponseError) as exc_info:
+                arxiv_api.download_paper("1234", dirpath=str(tmp_path))
+            assert "No paper found with ID: 1234" in str(exc_info.value)
+
+    def test_download_paper_fail_permission(
+        self, arxiv_api: ArxivAPI, tmp_path: str
+    ) -> None:
+        """Test download permission error"""
+        mock_paper = MagicMock()
+        mock_paper.title = "Test Paper"
+        mock_paper.download_pdf.side_effect = PermissionError("Read-only filesystem")
+
+        with patch.object(arxiv_api.client, "results", return_value=iter([mock_paper])):
+            with pytest.raises(APIRequestError) as exc_info:
+                arxiv_api.download_paper("1234.5678", dirpath=str(tmp_path))
+            assert (
+                exc_info.value.details.metadata is not None
+            )  # Ensure metadata exists (APIErrorDetail is Dict or None type)
+            exception_msg = exc_info.value.details.metadata["exception"]
+            assert "read-only" in exception_msg.lower()
+            assert exc_info.value.details.retryable is True
+
+    def test_search_retry_exhausted(self, arxiv_api: ArxivAPI) -> None:
+        """Test that search properly handles retry exhaustion when API requests keep failing."""
+        mock_error = arxiv.HTTPError(
+            url="http://arxiv.org/retry_fail",
+            retry=arxiv_api.max_retries,  # matches retry limit
+            status=503,
+        )
+
+        with patch.object(arxiv_api.client, "results", side_effect=mock_error):
+            with pytest.raises(APIRequestError) as exc_info:
+                arxiv_api.search("test query")
+
+            assert exc_info.value.status_code == 503
+            assert (
+                exc_info.value.details.metadata is not None
+            )  # Ensure metadata exists (APIErrorDetail is Dict or None type)
+            assert (
+                exc_info.value.details.metadata["retry_attempt"]
+                == arxiv_api.max_retries
+            )
+            assert exc_info.value.details.retryable is False
