@@ -113,6 +113,5 @@ class ArxivAPI(ResearchAPI):
             dirpath: Directory path to download the paper into (default current directory).
             filename: Custom filename (optional).
         """
-        search = arxiv.Search(id_list=[paper_id])
-        paper = next(self.client.results(search))
+        paper = next(self.client.results(arxiv.Search(id_list=[paper_id])))
         paper.download_pdf(dirpath=dirpath, filename=paper.title)
