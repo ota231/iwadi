@@ -87,35 +87,35 @@ class IEEEAPI(ResearchAPI):
             APIRequestError: For network/retryable errors
             APIAuthError: For authorization issues
         """
-        try:
-            # Validate query parameters
-            if not query.strip():
+        # Validate query parameters
+        if not query.strip():
+            raise APIResponseError(
+                message="Empty search query",
+                source="ieee",
+                details=APIErrorDetail(code="ieee:empty_query", retryable=False),
+            )
+
+        if "*" in query:
+            if query.count("*") > 2:
                 raise APIResponseError(
-                    message="Empty search query",
+                    message="Maximum 2 wildcards allowed",
                     source="ieee",
-                    details=APIErrorDetail(code="ieee:empty_query", retryable=False),
+                    details=APIErrorDetail(
+                        code="ieee:too_many_wildcards",
+                        retryable=False,
+                        metadata={"query": query},
+                    ),
+                )
+            if any(len(term) < 3 for term in query.split("*")[:-1]):
+                raise APIResponseError(
+                    message="Wildcard terms need ≥3 characters",
+                    source="ieee",
+                    details=APIErrorDetail(
+                        code="ieee:invalid_wildcard", retryable=False
+                    ),
                 )
 
-            if "*" in query:
-                if query.count("*") > 2:
-                    raise APIResponseError(
-                        message="Maximum 2 wildcards allowed",
-                        source="ieee",
-                        details=APIErrorDetail(
-                            code="ieee:too_many_wildcards",
-                            retryable=False,
-                            metadata={"query": query},
-                        ),
-                    )
-                if any(len(term) < 3 for term in query.split("*")[:-1]):
-                    raise APIResponseError(
-                        message="Wildcard terms need ≥3 characters",
-                        source="ieee",
-                        details=APIErrorDetail(
-                            code="ieee:invalid_wildcard", retryable=False
-                        ),
-                    )
-
+        try:
             # Build search query
             search_query = self.query.queryText(query)
 
@@ -288,7 +288,7 @@ class IEEEAPI(ResearchAPI):
                         message=f"PDF not found for paper {paper_id}",
                         source="ieee",
                         details=APIErrorDetail(
-                            code="ieee:pdf_not_found", retryable=False
+                            code="ieee:paper_not_found", retryable=False
                         ),
                     )
                 elif not response.ok:
@@ -332,6 +332,9 @@ class IEEEAPI(ResearchAPI):
                 details=APIErrorDetail(code="ieee:timeout", retryable=True),
             ) from e
         except Exception as e:
+            # do not re-wrap custom errors
+            if isinstance(e, (APIResponseError, APIAuthError, APIRequestError)):
+                raise
             raise APIRequestError(
                 message=f"Download failed: {str(e)}",
                 source="ieee",
