@@ -8,7 +8,7 @@ requires-python = ">=3.8"
 license = { text = "MIT" }
 
 [project.scripts]
-iwadi = "src.cli.main:app"  #src/cli/main.py contains your CLI app
+iwadi = "src.cli.app:app" # contains cli app
 
 [build-system]
 requires = ["setuptools>=42"]

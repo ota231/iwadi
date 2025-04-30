@@ -36,7 +36,8 @@ class BaseAPIError(Exception):
         self.status_code = status_code
         self.details = details or APIErrorDetail()
         self.source = source
-        super().__init__(message)
+        self.message = message
+        super().__init__(self.message)
 
     def __str__(self) -> str:
         base = f"[{self.source}] {self.__class__.__name__}: {super().__str__()}"
