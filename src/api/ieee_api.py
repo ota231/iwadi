@@ -1,4 +1,4 @@
-from .base_api import ResearchAPI, Paper, Citation
+from .base_api import ResearchAPI, Paper, Citation, SortOrder, SortBy
 from .xploreapi import Xplore
 from typing import List, Optional, Dict, Any
 from datetime import date
@@ -67,7 +67,8 @@ class IEEEAPI(ResearchAPI):
         before: Optional[date] = None,
         after: Optional[date] = None,
         author: Optional[str] = None,
-        sort: Optional[bool] = True,
+        sort_order: Optional[SortOrder] = "descending",
+        sort_by: Optional[SortBy] = "relevance",
     ) -> List[Paper]:
         """Search IEEE Xplore for papers matching criteria.
 
@@ -119,20 +120,27 @@ class IEEEAPI(ResearchAPI):
             # Build search query
             search_query = self.query.queryText(query)
 
-            # Date filters
             if before:
                 search_query.insertionEndDate(before.strftime("%Y%m%d"))
             if after:
                 search_query.insertionStartDate(after.strftime("%Y%m%d"))
-
-            # Author filter
             if author:
                 search_query.authorText(author)
 
-            # Sorting
-            search_query.resultsSorting(
-                "publicationYear" if not sort else "relevance", "desc"
-            )
+            sort_field_map = {
+                "submitted_date": "publication_year",
+                "title": "article_title",
+                "author": "author",
+                "relevance": None,  # No explicit sort field for relevance; default behavior
+            }
+
+            sort_field = sort_field_map.get(sort_by or "relevance")
+            order = "asc" if (sort_order or "descending") == "ascending" else "desc"
+
+            if sort_by == "relevance" or sort_field is None:
+                search_query.resultsSorting("relevance", order)
+            else:
+                search_query.resultsSorting(sort_field, order)
 
             # Result limits
             search_query.startingResult(0)

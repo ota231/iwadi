@@ -1,7 +1,16 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 from datetime import date
 from abc import ABC, abstractmethod
+
+SortOrder = Literal["ascending", "descending"]
+SortBy = Literal[
+    "relevance",  # only arxiv
+    "last_updated_date",  # only arxiv
+    "submitted_date",  # publication_year for IEEE
+    "title",
+    "author",
+]
 
 
 @dataclass
@@ -38,7 +47,8 @@ class ResearchAPI(ABC):
         before: Optional[date],
         after: Optional[date],
         author: Optional[str],
-        sort: Optional[bool],
+        sort_order: Optional[SortOrder],
+        sort_by: Optional[SortBy],
     ) -> List[Paper]:
         """Search for papers given a query string."""
         pass

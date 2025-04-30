@@ -179,12 +179,13 @@ class TestIEEEAPI:
             before=date(2023, 12, 31),
             after=date(2020, 1, 1),
             author="Smith",
-            sort=False,
+            sort_order="ascending",
+            sort_by="submitted_date",
         )
 
         mock_query.queryText.assert_called_once_with("AI")
         mock_query.insertionEndDate.assert_called_once_with("20231231")
         mock_query.insertionStartDate.assert_called_once_with("20200101")
         mock_query.authorText.assert_called_once_with("Smith")
-        mock_query.resultsSorting.assert_called_once_with("publicationYear", "desc")
+        mock_query.resultsSorting.assert_called_once_with("publication_year", "asc")
         mock_query.maximumResults.assert_called_once_with(5)

@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Optional, List, Union, Dict
+from typing import Optional, List, Union, Dict, cast
 import typer
 from src.api.arxiv_api import ArxivAPI
 from src.api.ieee_api import IEEEAPI
-from src.api.base_api import Paper
+from src.api.base_api import Paper, SortBy, SortOrder
 from src.cli.utils.display import display_papers, display_error, validate_format
 from src.cli.utils.interactive import prompt_paper_selection
 from src.cli.utils.error_handler import api_error_handler
@@ -34,8 +34,11 @@ def query(
         help="Sources to search",
         autocompletion=lambda: ["arxiv", "ieee"],
     ),
-    sort: str = typer.Option(
+    sort_by: str = typer.Option(
         "relevance", "--sort", help="Sort method", case_sensitive=False
+    ),
+    sort_order: str = typer.Option(
+        "descending", "--order", help="Sort order", case_sensitive=False
     ),
     limit: int = typer.Option(
         10, "--limit", "-l", help="Maximum results per source", min=1, max=100
@@ -60,9 +63,17 @@ def query(
         display_error("Search query cannot be empty")
         raise typer.Exit(code=1)
 
-    if sort.lower() not in ["relevance", "cited", "newest"]:
-        display_error("Invalid sort method. Choose from: relevance, cited, newest")
+    if sort_by.lower() not in ["relevance", "author", "last_updatted_date", "submitted_date"]:
+        display_error("Invalid sort method. Choose from: relevance, author, last_updatted_date, submitted_date")
         raise typer.Exit(code=1)
+    
+    if sort_order.lower() not in ["ascending", "descending"]:
+        display_error("Invalid sort order. Choose from: ascending, descending")
+        raise typer.Exit(code=1)
+    
+    # cast to literals
+    sort_by_lit = cast(SortBy, sort_by.lower())
+    sort_order_lit = cast(SortOrder, sort_order.lower())
 
     # Convert years to dates
     after_date = date(after, 1, 1) if after else None
@@ -82,7 +93,8 @@ def query(
                 author=author,
                 after=after_date,
                 before=before_date,
-                sort=(sort.lower() == "cited"),
+                sort_by=sort_by_lit,
+                sort_order=sort_order_lit,
                 limit=limit,
             )
             all_results.extend(results)

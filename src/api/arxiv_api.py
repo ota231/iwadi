@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Optional
 import arxiv
-from .base_api import ResearchAPI, Paper, Citation
+from .base_api import ResearchAPI, Paper, Citation, SortOrder, SortBy
 from .base_api_error import (
     APIRequestError,
     APIResponseError,
@@ -80,7 +80,8 @@ class ArxivAPI(ResearchAPI):
         before: Optional[date] = None,
         after: Optional[date] = None,
         author: Optional[str] = None,
-        sort: Optional[bool] = True,
+        sort_order: Optional[SortOrder] = "descending",
+        sort_by: Optional[SortBy] = "relevance",
     ) -> List[Paper]:
         try:
             query_parts = [query]
@@ -91,13 +92,26 @@ class ArxivAPI(ResearchAPI):
             if after:
                 query_parts.append(f"submittedDate:[{after.isoformat()} TO *]")
 
+            sort_criterion_map = {
+                "relevance": arxiv.SortCriterion.Relevance,
+                "last_updated_date": arxiv.SortCriterion.LastUpdatedDate,
+                "submitted_date": arxiv.SortCriterion.SubmittedDate,
+            }
+
+            sort_order_map = {
+                "ascending": arxiv.SortOrder.Ascending,
+                "descending": arxiv.SortOrder.Descending,
+            }
+
+            # criterion and value can be None
+            sort_criterion = sort_criterion_map.get(sort_by or "relevance", arxiv.SortCriterion.Relevance)
+            sort_order_value = sort_order_map.get(sort_order or "descending", arxiv.SortOrder.Descending)
+
             search = arxiv.Search(
                 query=" AND ".join(query_parts),
                 max_results=limit,
-                sort_by=arxiv.SortCriterion.Relevance
-                if sort
-                else arxiv.SortCriterion.SubmittedDate,
-                sort_order=arxiv.SortOrder.Descending,
+                sort_by=sort_criterion,
+                sort_order=sort_order_value,
             )
 
             # obtain results before processing to make error catching easier
