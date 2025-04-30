@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Optional
 import typer
 from src.cli.utils.error_handler import api_error_handler
-from datetime import datetime
-import json
+from src.cli.project import Project
+from src.cli.context import IwadiContext
 
 app = typer.Typer()
 
@@ -22,6 +22,7 @@ def create(
         writable=True,
         resolve_path=True,
     ),
+    ctx: Optional[typer.Context] = None,
 ) -> None:
     """
     Create a new research project with organized directory structure.
@@ -29,6 +30,9 @@ def create(
     Example:
     iwadi project create quantum_ml
     """
+    assert ctx is not None
+    iwadi_ctx: IwadiContext = ctx.obj
+
     # Validate project name
     if not name.replace("_", "").isalnum():
         typer.secho(
@@ -40,30 +44,27 @@ def create(
     if base_path is None:
         base_path = Path.home() / "iwadi_projects"
 
-    project_path = base_path / name
-    papers_path = project_path / "papers"
-    notes_path = project_path / "notes"
+    project = Project(name=name, base_path=base_path)
+    iwadi_ctx.set_project(project)
+    typer.secho(f"Active project set to {name}", fg="green")
 
     try:
         # Create directory structure
-        papers_path.mkdir(parents=True, exist_ok=False)
-        notes_path.mkdir(exist_ok=False)
+        project.path.mkdir(parents=True, exist_ok=False)
+        project.papers_path.mkdir(exist_ok=False)
+        project.notes_path.mkdir(exist_ok=False)
 
-        # Create basic metadata file
-        metadata = {
-            "project_name": name,
-            "created": datetime.now().isoformat(),
-            "papers": [],
-        }
-        (project_path / "project_meta.json").write_text(json.dumps(metadata, indent=2))
+        # Save metadata
+        project.save_metadata()
 
-        typer.secho(f"Created project '{name}' at: {project_path}", fg="green")
-        typer.echo(f"• Papers directory: {papers_path}")
-        typer.echo(f"• Notes directory: {notes_path}")
+        # Output results
+        typer.secho(f"Created project '{name}' at: {project.path}", fg="green")
+        typer.echo(f"• Papers directory: {project.papers_path}")
+        typer.echo(f"• Notes directory: {project.notes_path}")
 
     except FileExistsError:
         typer.secho(
-            f"Error: Project '{name}' already exists at {project_path}", fg="red"
+            f"Error: Project '{name}' already exists at {project.path}", fg="red"
         )
         raise typer.Exit(code=1)
     except PermissionError:

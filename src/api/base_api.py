@@ -21,7 +21,7 @@ class Paper:
     abstract: str
     pdf_url: Optional[str] = None
     publication_date: Optional[date] = None
-    source: Optional[str] = None
+    source: Optional[str] = None  # TODO: make source type + make mandatory
     doi: Optional[str] = None
     citation_count: Optional[int] = 0
 

@@ -252,11 +252,6 @@ class IEEEAPI(ResearchAPI):
             APIAuthError: For authorization problems
         """
         try:
-            # Validate/setup directory
-            os.makedirs(dirpath, exist_ok=True)
-            if not os.access(dirpath, os.W_OK):
-                raise PermissionError(f"Cannot write to {dirpath}")
-
             # Build PDF URL (IEEE direct download pattern)
             pdf_url = (
                 "http://ieeexplore.ieee.org/stampPDF/getPDF.jsp?"

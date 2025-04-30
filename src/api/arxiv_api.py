@@ -104,8 +104,12 @@ class ArxivAPI(ResearchAPI):
             }
 
             # criterion and value can be None
-            sort_criterion = sort_criterion_map.get(sort_by or "relevance", arxiv.SortCriterion.Relevance)
-            sort_order_value = sort_order_map.get(sort_order or "descending", arxiv.SortOrder.Descending)
+            sort_criterion = sort_criterion_map.get(
+                sort_by or "relevance", arxiv.SortCriterion.Relevance
+            )
+            sort_order_value = sort_order_map.get(
+                sort_order or "descending", arxiv.SortOrder.Descending
+            )
 
             search = arxiv.Search(
                 query=" AND ".join(query_parts),

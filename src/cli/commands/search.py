@@ -1,21 +1,27 @@
 from datetime import date
-from typing import Optional, List, Union, Dict, cast
+from typing import Optional, List, Union, cast
 import typer
 from src.api.arxiv_api import ArxivAPI
 from src.api.ieee_api import IEEEAPI
+from src.api.base_api import ResearchAPI
 from src.api.base_api import Paper, SortBy, SortOrder
 from src.cli.utils.display import display_papers, display_error, validate_format
 from src.cli.utils.interactive import prompt_paper_selection
 from src.cli.utils.error_handler import api_error_handler
 from src.cli.commands.save import save_papers
+from src.cli.context import IwadiContext
 
 app = typer.Typer(help="Search research papers across multiple sources")
 
+API_MAP = {
+    "arxiv": ArxivAPI(),
+    "ieee": IEEEAPI(),
+}
 
-def get_api(source: str) -> Optional[Union[ArxivAPI, IEEEAPI]]:
+
+def get_api(source: str) -> Optional[Union[ResearchAPI, None]]:
     """Factory method for API instances with proper typing"""
-    apis: Dict[str, Union[ArxivAPI, IEEEAPI]] = {"arxiv": ArxivAPI(), "ieee": IEEEAPI()}
-    return apis.get(source.lower())
+    return API_MAP.get(source.lower()) if source else None
 
 
 @app.command()
@@ -49,6 +55,7 @@ def query(
     output_format: str = typer.Option(
         "table", "--format", "-f", help="Output format", case_sensitive=False
     ),
+    ctx: Optional[typer.Context] = None,
 ) -> None:
     """
     Search research papers across multiple sources
@@ -58,19 +65,30 @@ def query(
     iwadi search "quantum computing" --author "Preskill" --after 2018
     iwadi search "neural networks" --source arxiv --source ieee --limit 5
     """
+
+    assert ctx is not None
+    iwadi_ctx: IwadiContext = ctx.obj
+
     # Validate inputs
     if not query.strip():
         display_error("Search query cannot be empty")
         raise typer.Exit(code=1)
 
-    if sort_by.lower() not in ["relevance", "author", "last_updatted_date", "submitted_date"]:
-        display_error("Invalid sort method. Choose from: relevance, author, last_updatted_date, submitted_date")
+    if sort_by.lower() not in [
+        "relevance",
+        "author",
+        "last_updatted_date",
+        "submitted_date",
+    ]:
+        display_error(
+            "Invalid sort method. Choose from: relevance, author, last_updatted_date, submitted_date"
+        )
         raise typer.Exit(code=1)
-    
+
     if sort_order.lower() not in ["ascending", "descending"]:
         display_error("Invalid sort order. Choose from: ascending, descending")
         raise typer.Exit(code=1)
-    
+
     # cast to literals
     sort_by_lit = cast(SortBy, sort_by.lower())
     sort_order_lit = cast(SortOrder, sort_order.lower())
@@ -119,9 +137,7 @@ def query(
         selected = prompt_paper_selection(all_results)
         if selected:
             project = typer.prompt("Enter project name to save to")
-            save_papers(
-                selected, project_path=project
-            )  # TODO: Get proper project path name
+            save_papers(selected, project_name=project, ctx=iwadi_ctx)
             typer.secho(
                 f"Saved {len(selected)} papers to project '{project}'", fg="green"
             )
