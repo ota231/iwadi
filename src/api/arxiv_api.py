@@ -79,8 +79,8 @@ class ArxivAPI(ResearchAPI):
         limit: int = 10,
         before: Optional[date] = None,
         after: Optional[date] = None,
-        author: str = "",
-        sort: bool = True,
+        author: Optional[str] = None,
+        sort: Optional[bool] = True,
     ) -> List[Paper]:
         try:
             query_parts = [query]

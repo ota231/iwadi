@@ -37,8 +37,8 @@ class ResearchAPI(ABC):
         limit: int,
         before: Optional[date],
         after: Optional[date],
-        author: str,
-        sort: bool,
+        author: Optional[str],
+        sort: Optional[bool],
     ) -> List[Paper]:
         """Search for papers given a query string."""
         pass
