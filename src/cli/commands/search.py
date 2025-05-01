@@ -32,7 +32,7 @@ def get_api(source: str) -> Optional[Union[ResearchAPI, None]]:
     "-s",
     "sources",
     multiple=True,
-    default=["arxiv", "ieee"],
+    default=["arxiv"],
     help="Sources to search",
 )
 @click.option(

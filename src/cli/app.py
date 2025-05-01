@@ -3,6 +3,7 @@ from src.cli.commands import create_project, list_projects, search, save
 from src.cli.context import IwadiContext
 
 
+# TODO: Add logging
 @click.group()
 @click.pass_context
 def app(ctx: click.Context) -> None:
