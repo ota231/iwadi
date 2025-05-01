@@ -1,15 +1,12 @@
 from typing import Optional, List
-import typer
+import click
 from src.api.base_api import Paper
 from src.cli.utils.interactive import prompt_paper_selection
 from src.cli.utils.error_handler import api_error_handler
-from src.cli.utils.completion import complete_projects
 from src.api.arxiv_api import ArxivAPI
 from src.api.ieee_api import IEEEAPI
 from src.cli.context import IwadiContext
 from pathlib import Path
-
-app = typer.Typer()
 
 API_MAP = {
     "arxiv": ArxivAPI(),
@@ -17,38 +14,27 @@ API_MAP = {
 }
 
 
-@app.command()
+@click.command()
+@click.argument("paper_ids", nargs=-1)
+@click.option(
+    "--project", "-p", help="Project to save to (uses active project if not specified)"
+)
+@click.option("--interactive", "-i", is_flag=True, help="Select papers interactively")
+@click.pass_context
 @api_error_handler
-def papers(
-    paper_ids: Optional[List[str]] = typer.Argument(
-        None,
-        help="Paper IDs to save",
-        autocompletion=lambda: [p.id for p in get_recent_papers()],
-    ),
-    project: Optional[str] = typer.Option(
-        None,
-        "--project",
-        "-p",
-        help="Project to save to (uses active project if not specified)",
-        autocompletion=complete_projects,
-    ),
-    interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Select papers interactively"
-    ),
-    ctx: Optional[typer.Context] = None,
+def save_papers(
+    ctx: click.Context, paper_ids: List[str], project: Optional[str], interactive: bool
 ) -> None:
-    """Save papers to a research project."""
-    assert ctx is not None
+    """Save papers to a project."""
     iwadi_ctx: IwadiContext = ctx.obj
 
-    # Validate we have either an active project or a specified project
     if not project and not iwadi_ctx.active_project:
-        typer.secho(
+        click.secho(
             "No project specified and no active project set. "
             "Use --project or set an active project.",
             fg="red",
         )
-        raise typer.Exit(1)
+        ctx.exit(1)
 
     target_project_name = (
         project if not iwadi_ctx.active_project else iwadi_ctx.active_project.name
@@ -61,43 +47,43 @@ def papers(
     )
 
     if not paper_ids and not interactive:
-        typer.secho("Must specify either paper IDs or --interactive", fg="red")
-        raise typer.Exit(1)
+        click.secho("Must specify either paper IDs or use --interactive", fg="red")
+        ctx.exit(1)
 
     available_papers = get_recent_papers()
 
     if interactive:
         selected_papers = prompt_paper_selection(available_papers)
     else:
-        selected_papers = [p for p in available_papers if p.id in (paper_ids or [])]
+        selected_papers = [p for p in available_papers if p.id in paper_ids]
 
     if not selected_papers:
-        typer.secho("No papers selected to save.", fg="yellow")
+        click.secho("No papers selected to save.", fg="yellow")
         return
 
     for paper in selected_papers:
         if not paper.source:
-            typer.secho(f"Skipping {paper.id}: No source available", fg="yellow")
+            click.secho(f"Skipping {paper.id}: No source available", fg="yellow")
             continue
         source_api = API_MAP.get(paper.source.lower())
         if not source_api:
-            typer.secho(
+            click.secho(
                 f"Skipping {paper.id}: Unsupported source {paper.source}", fg="yellow"
             )
             continue
 
         try:
             source_api.download_paper(paper.id, dirpath=str(papers_dir))
-            typer.secho(f"✓ Saved {paper.title[:50]}...", fg="green")
-
+            click.secho(f"✓ Saved {paper.title[:50]}...", fg="green")
         except Exception as e:
-            typer.secho(f"Failed to save {paper.id}: {str(e)}", fg="red")
+            click.secho(f"Failed to save {paper.id}: {str(e)}", fg="red")
 
-    typer.secho(
+    click.secho(
         f"\nSaved {len(selected_papers)} papers to project '{target_project_name}'",
         fg="green",
         bold=True,
     )
+    # TODO: metadata saving, in DB
 
 
 def get_recent_papers() -> List[Paper]:
@@ -121,30 +107,3 @@ def get_recent_papers() -> List[Paper]:
             abstract="Sample abstract 2",
         ),
     ]
-
-
-def save_papers(papers: List[Paper], project_name: str, ctx: IwadiContext) -> None:
-    """Download paper PDFs using context for path resolution"""
-    try:
-        papers_dir = ctx.get_papers_path()
-
-        for paper in papers:
-            source_api = API_MAP.get(paper.source.lower()) if paper.source else None
-            if not source_api:
-                typer.secho(f"Unsupported source: {paper.source}", fg="red")
-                continue
-
-            try:
-                source_api.download_paper(paper.id, dirpath=str(papers_dir))
-                typer.secho(
-                    f"Saved: {paper.title} to project {project_name} in {str(papers_dir)}",
-                    fg="cyan",
-                )
-
-            except Exception as e:
-                typer.secho(f"Failed to download {paper.id}: {str(e)}", fg="red")
-
-    except ValueError as e:
-        typer.secho(f"Error: {str(e)}", fg="red")
-        raise typer.Exit(1)
-    # TODO: metadata saving, in DB

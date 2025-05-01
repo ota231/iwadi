@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar
 from functools import wraps
-import typer
+import click
 from src.api.base_api_error import BaseAPIError
 from typing import Tuple
 
@@ -16,7 +16,7 @@ def api_error_handler(func: Callable[..., T]) -> Callable[..., T]:
         try:
             return func(*args, **kwargs)
         except BaseAPIError as e:
-            typer.secho(f"\nError [{e.details.code}]: {e.message}", fg="red", err=True)
-            raise typer.Exit(code=1)
+            click.secho(f"\nError [{e.details.code}]: {e.message}", fg="red", err=True)
+            raise click.Abort()
 
     return wrapper

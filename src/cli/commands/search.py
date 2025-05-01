@@ -1,17 +1,15 @@
+import click
 from datetime import date
 from typing import Optional, List, Union, cast
-import typer
+
 from src.api.arxiv_api import ArxivAPI
 from src.api.ieee_api import IEEEAPI
-from src.api.base_api import ResearchAPI
-from src.api.base_api import Paper, SortBy, SortOrder
+from src.api.base_api import ResearchAPI, Paper, SortBy, SortOrder
 from src.cli.utils.display import display_papers, display_error, validate_format
 from src.cli.utils.interactive import prompt_paper_selection
 from src.cli.utils.error_handler import api_error_handler
 from src.cli.commands.save import save_papers
 from src.cli.context import IwadiContext
-
-app = typer.Typer(help="Search research papers across multiple sources")
 
 API_MAP = {
     "arxiv": ArxivAPI(),
@@ -24,90 +22,114 @@ def get_api(source: str) -> Optional[Union[ResearchAPI, None]]:
     return API_MAP.get(source.lower()) if source else None
 
 
-@app.command()
+@click.command(help="Search research papers across multiple sources")
+@click.argument("search", required=True)
+@click.option("--author", "-a", help="Filter by author name")
+@click.option("--after", type=int, help="Year after (inclusive)")
+@click.option("--before", type=int, help="Year before (inclusive)")
+@click.option(
+    "--source",
+    "-s",
+    "sources",
+    multiple=True,
+    default=["arxiv", "ieee"],
+    help="Sources to search",
+)
+@click.option(
+    "--sort",
+    "sort_by",
+    default="relevance",
+    help="Sort method (relevance, author, last_updated_date, submitted_date)",
+    show_default=True,
+)
+@click.option(
+    "--order",
+    "sort_order",
+    default="descending",
+    help="Sort order (ascending, descending)",
+    show_default=True,
+)
+@click.option(
+    "--limit",
+    "-l",
+    default=10,
+    type=click.IntRange(1, 100),
+    help="Maximum results per source",
+    show_default=True,
+)
+@click.option("--save", "-S", is_flag=True, help="Prompt to save results after display")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    default="table",
+    help="Output format (table, json, etc.)",
+    show_default=True,
+)
+@click.pass_context
 @api_error_handler
-def query(
-    query: str = typer.Argument(..., help="Search terms"),
-    author: Optional[str] = typer.Option(
-        None, "--author", "-a", help="Filter by author name"
-    ),
-    after: Optional[int] = typer.Option(None, help="Year after (inclusive)"),
-    before: Optional[int] = typer.Option(None, help="Year before (inclusive)"),
-    sources: List[str] = typer.Option(
-        ["arxiv", "ieee"],
-        "--source",
-        "-s",
-        help="Sources to search",
-        autocompletion=lambda: ["arxiv", "ieee"],
-    ),
-    sort_by: str = typer.Option(
-        "relevance", "--sort", help="Sort method", case_sensitive=False
-    ),
-    sort_order: str = typer.Option(
-        "descending", "--order", help="Sort order", case_sensitive=False
-    ),
-    limit: int = typer.Option(
-        10, "--limit", "-l", help="Maximum results per source", min=1, max=100
-    ),
-    save: bool = typer.Option(
-        False, "--save", "-S", help="Prompt to save results after display"
-    ),
-    output_format: str = typer.Option(
-        "table", "--format", "-f", help="Output format", case_sensitive=False
-    ),
-    ctx: Optional[typer.Context] = None,
+def search(
+    ctx: click.Context,
+    search: str,
+    author: Optional[str],
+    after: Optional[int],
+    before: Optional[int],
+    sources: List[str],
+    sort_by: str,
+    sort_order: str,
+    limit: int,
+    save: bool,
+    output_format: str,
 ) -> None:
     """
-    Search research papers across multiple sources
+    Search research papers across multiple sources.
 
     Examples:
 
-    iwadi search "quantum computing" --author "Preskill" --after 2018
-    iwadi search "neural networks" --source arxiv --source ieee --limit 5
+        iwadi search "quantum computing" --author "Preskill" --after 2018
+        iwadi search "neural networks" --source arxiv --source ieee --limit 5
     """
 
-    assert ctx is not None
     iwadi_ctx: IwadiContext = ctx.obj
 
-    # Validate inputs
-    if not query.strip():
+    if not search.strip():
         display_error("Search query cannot be empty")
-        raise typer.Exit(code=1)
+        raise click.Abort()
 
     if sort_by.lower() not in [
         "relevance",
         "author",
-        "last_updatted_date",
+        "last_updated_date",
         "submitted_date",
     ]:
         display_error(
-            "Invalid sort method. Choose from: relevance, author, last_updatted_date, submitted_date"
+            "Invalid sort method. Choose from: relevance, author, last_updated_date, submitted_date"
         )
-        raise typer.Exit(code=1)
+        raise click.Abort()
 
     if sort_order.lower() not in ["ascending", "descending"]:
         display_error("Invalid sort order. Choose from: ascending, descending")
-        raise typer.Exit(code=1)
+        raise click.Abort()
 
-    # cast to literals
     sort_by_lit = cast(SortBy, sort_by.lower())
     sort_order_lit = cast(SortOrder, sort_order.lower())
 
-    # Convert years to dates
     after_date = date(after, 1, 1) if after else None
     before_date = date(before, 12, 31) if before else None
 
-    # Execute searches
     all_results: List[Paper] = []
+
     for source in sources:
         api = get_api(source)
         if not api:
-            display_error(f"Unknown source: {source}")
+            display_error(
+                f"Unknown source: {source}. Valid sources: {', '.join(API_MAP.keys())}"
+            )
             continue
 
         try:
             results = api.search(
-                query=query,
+                query=search,
                 author=author,
                 after=after_date,
                 before=before_date,
@@ -120,28 +142,22 @@ def query(
             display_error(f"Error searching {source}: {str(e)}")
             continue
 
-    # Display results
     if not all_results:
         display_error("No results found across all sources")
-        raise typer.Exit(code=1)
+        raise click.Abort()
 
     try:
         fmt = validate_format(output_format)
         display_papers(all_results, format=fmt)
     except ValueError as e:
         display_error(str(e))
-        raise typer.Exit(1)
+        raise click.Abort()
 
-    # Handle saving
-    if save or typer.confirm("\nWould you like to save any papers?"):
+    if save or click.confirm("\nWould you like to save any papers?"):
         selected = prompt_paper_selection(all_results)
         if selected:
-            project = typer.prompt("Enter project name to save to")
+            project = click.prompt("Enter project name to save to")
             save_papers(selected, project_name=project, ctx=iwadi_ctx)
-            typer.secho(
+            click.secho(
                 f"Saved {len(selected)} papers to project '{project}'", fg="green"
             )
-
-
-if __name__ == "__main__":
-    app()

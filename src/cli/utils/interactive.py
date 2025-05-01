@@ -1,18 +1,18 @@
 from typing import List, Optional
-import typer
+import click
 from src.api.base_api import Paper
 
 
 def prompt_paper_selection(papers: List[Paper]) -> Optional[List[Paper]]:
     """Interactive paper selection prompt."""
     if not papers:
-        typer.secho("No papers found to select.", fg="red")
+        click.secho("No papers found to select.", fg="red")
         return None
 
     # Display papers with numbering
     for idx, paper in enumerate(papers, start=1):
-        typer.echo(
-            f"{idx}. {typer.style(paper.title, bold=True)}\n"
+        click.echo(
+            f"{idx}. {click.style(paper.title, bold=True)}\n"
             f"   Authors: {', '.join(paper.authors[:3])}"
             f"{'...' if len(paper.authors) > 3 else ''}\n"
             f"   Year: {paper.publication_date.year if paper.publication_date else 'N/A'}"
@@ -20,7 +20,7 @@ def prompt_paper_selection(papers: List[Paper]) -> Optional[List[Paper]]:
 
     # Prompt with validation
     while True:
-        selected = typer.prompt(
+        selected = click.prompt(
             "Select papers to save (comma-separated numbers or 'all')", default="all"
         )
 
@@ -34,4 +34,4 @@ def prompt_paper_selection(papers: List[Paper]) -> Optional[List[Paper]]:
         except ValueError:
             pass
 
-        typer.secho("Invalid selection. Please try again.", fg="red")
+        click.secho("Invalid selection. Please try again.", fg="red")

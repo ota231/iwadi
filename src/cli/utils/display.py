@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 from tabulate import tabulate
-import typer
+import click
 from src.api.base_api import Paper
 
 DisplayFormat = Literal["table", "json", "minimal"]
@@ -15,7 +15,7 @@ def display_papers(papers: List[Paper], format: DisplayFormat = "table") -> None
         format: Output format (table|json|minimal)
     """
     if not papers:
-        typer.secho("No papers to display", fg="yellow")
+        click.secho("No papers to display", fg="yellow")
         return
 
     if format == "json":
@@ -48,7 +48,7 @@ def _display_table(papers: List[Paper]) -> None:
         rows.append(
             [
                 idx,
-                typer.style(
+                click.style(
                     paper.title[:60] + ("..." if len(paper.title) > 60 else ""),
                     bold=True,
                 ),
@@ -59,7 +59,7 @@ def _display_table(papers: List[Paper]) -> None:
             ]
         )
 
-    typer.echo(tabulate(rows, headers=headers, tablefmt="grid"))
+    click.echo(tabulate(rows, headers=headers, tablefmt="grid"))
 
 
 def _display_minimal(papers: List[Paper]) -> None:
@@ -67,8 +67,8 @@ def _display_minimal(papers: List[Paper]) -> None:
     for idx, paper in enumerate(papers, 1):
         authors = ", ".join(a.split()[0] for a in paper.authors[:2])
         year = paper.publication_date.year if paper.publication_date else "N/A"
-        typer.echo(
-            f"{idx}. {typer.style(paper.title[:80], bold=True)} ({authors}, {year})"
+        click.echo(
+            f"{idx}. {click.style(paper.title[:80], bold=True)} ({authors}, {year})"
         )
 
 
@@ -90,14 +90,14 @@ def _display_json(papers: List[Paper]) -> None:
         }
         for paper in papers
     ]
-    typer.echo(json.dumps(output, indent=2))
+    click.echo(json.dumps(output, indent=2))
 
 
 def display_error(message: str, details: Optional[str] = None) -> None:
     """Display error message with consistent formatting"""
-    typer.secho("\nError: ", fg="red", nl=False, bold=True)
-    typer.echo(message)
+    click.secho("\nError: ", fg="red", nl=False, bold=True)
+    click.echo(message)
     if details:
-        typer.secho("Details: ", fg="yellow", nl=False)
-        typer.echo(details)
-    typer.echo("")
+        click.secho("Details: ", fg="yellow", nl=False)
+        click.echo(details)
+    click.echo("")
