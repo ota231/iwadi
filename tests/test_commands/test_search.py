@@ -16,7 +16,6 @@ def test_search_basic() -> None:
     assert "Authors" in result.stdout
 
 
-
 # TODO: CLI Runner
 # TODO: Check error handling i.e. rate limits, no results
 # TODO: check that parameters are passed correctly

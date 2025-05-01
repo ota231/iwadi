@@ -1,4 +1,4 @@
-.PHONY: build check format test
+.PHONY: build check format test docs
 
 format:
 	ruff format .
@@ -10,4 +10,8 @@ check:
 test:
 	PYTHONPATH=./ pytest
 
-build: format check test
+docs:
+	sphinx-apidoc -o docs/source src
+	make -C docs html
+
+build: format check test docs
