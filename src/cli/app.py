@@ -1,5 +1,5 @@
 import click
-from src.cli.commands import project_create, search, save, project_list
+from src.cli.commands import create_project, list_projects, search, save
 from src.cli.context import IwadiContext
 
 
@@ -11,8 +11,8 @@ def app(ctx: click.Context) -> None:
 
 
 # Register subcommands
-app.add_command(project_create.create, name="project-create")
-app.add_command(project_list.list, name="project-list")
+app.add_command(create_project.create, name="create-project")
+app.add_command(list_projects.list, name="list-projects")
 app.add_command(search.search, name="search")
 app.add_command(save.save_papers, name="save")
 

@@ -36,3 +36,10 @@ pip freeze > requirements.txt
 make build
 ```
 runs: `ruff format && ruff check . && mypy .`
+
+### Testing
+```bash
+pip uninstall iwadi
+rm -rf src/iwadi.egg-info
+pip install -e .
+```
