@@ -1,7 +1,7 @@
 name: Deploy Docs to GitHub Pages
 on:
   push:
-    branches: [ main ]  # Trigger on pushes to main/master
+    branches: [ main, master ]  # Trigger on pushes to main/master
   workflow_dispatch:    # Allow manual triggers
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           pip install myst-parser sphinx
       - name: Build docs
         run: |
-          cd docs       # Change if your docs are elsewhere
+          cd docs      
           make html
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
