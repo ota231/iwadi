@@ -5,6 +5,8 @@
 
 A command-line tool for managing academic papers with AI-powered search, organization, and analysis.
 
+website link: https://ota231.github.io/iwadi/
+
 
 ## Development Setup
 

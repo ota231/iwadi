@@ -6,6 +6,8 @@ from src.cli.utils.error_handler import api_error_handler
 from src.api.arxiv_api import ArxivAPI
 from src.api.ieee_api import IEEEAPI
 from src.cli.context import IwadiContext
+from src.storage.db import save_paper_in_db
+from src.cli.project import Project
 from pathlib import Path
 
 API_MAP = {
@@ -39,6 +41,8 @@ def save_papers(
     target_project_name = (
         project if not iwadi_ctx.active_project else iwadi_ctx.active_project.name
     )
+
+    assert target_project_name is not None
 
     papers_dir = (
         iwadi_ctx.get_papers_path()
@@ -74,6 +78,15 @@ def save_papers(
 
         try:
             source_api.download_paper(paper.id, dirpath=str(papers_dir))
+            # metadata saving in DB
+            pdf_path = papers_dir / f"{paper.id}.pdf"
+            save_paper_in_db(
+                paper,
+                iwadi_ctx.active_project
+                or Project(name=target_project_name, base_path=Path("projects")),
+                pdf_path,
+            )
+
             click.secho(f"✓ Saved {paper.title[:50]}...", fg="green")
         except Exception as e:
             click.secho(f"Failed to save {paper.id}: {str(e)}", fg="red")
@@ -83,7 +96,6 @@ def save_papers(
         fg="green",
         bold=True,
     )
-    # TODO: metadata saving, in DB
 
 
 def get_recent_papers() -> List[Paper]:
