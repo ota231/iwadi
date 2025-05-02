@@ -1,47 +1,60 @@
-# iwadi - CLI Research Assistant
+# 🧠 iwadi - CLI Research Assistant
 
 ![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A command-line tool for managing academic papers with AI-powered search, organization, and analysis.
-
-website link: https://ota231.github.io/iwadi/
+Originating from the yoruba translation of "investigation" iwadi is a command-line research assistant designed to streamline your academic workflow. It helps you manage papers, extract metadata, and leverage local LLMs for AI-powered search, summarization, and conversational queries — all while keeping your data fully local and private.
 
 
-## Development Setup
+📚 Full documentation: https://ota231.github.io/iwadi/
 
-### Prerequisites
-- Python 3.8+
-- pip 20.3+
+## ✨ Features
+- 🗂️ Browse different scholarly websites from the comfort of your CLI
 
+- 🔍 Automated management and storage of desired papers
 
-### macOS/Linux
+- 🤖 (still under development): AI support including chatting with papers, finding similar papers, and visualizing relevent data
+
+## Installation
+
+Clone the repository
+
 ```bash
-python3 -m venv .venv # only needed once
-source .venv/bin/activate # run each time
-pip install -e . # not sure how often this should be
-
+git clone https://github.com/ota231/iwadi
+cd iwadi
 ```
 
-### install requirements
+Create and activate virtual environment
+```bash
+python3 -m venv .venv  # One-time setup
+source .venv/bin/activate  # Run each time you work
+```
+
+Install requirements
 ```bash
 pip install -r requirements.txt
 ```
 
-### updating requirements.txt
+Set your IEEE API key in a local `.env` file:
 ```bash
-pip freeze > requirements.txt
+echo "IEEE_API_KEY=your_key_here" > .env
 ```
 
-### formatting and linting
+## 🛠️ Development & Build
 ```bash
-make build
+make format     # Format code with Ruff
+make check      # Run type checking with mypy
+make test       # Run tests
+make docs       # Build Sphinx docs
+make build      # Package the project
+pip freeze > requirements.txt  # Update dependency list
 ```
-runs: `ruff format && ruff check . && mypy .`
 
-### Testing
+
+## ⚙️ Simulating the CLI Locally
+To test the CLI on your machine as if installed via `pip`:
 ```bash
 pip uninstall iwadi
-rm -rf src/iwadi.egg-info
-pip install -e .
+rm -rf src/iwadi.egg-info  # If it exists
+pip install -e .  # Editable install
 ```
