@@ -1,5 +1,5 @@
 import click
-from src.cli.commands import create_project, list_projects, search, save
+from src.cli.commands import create_project, list_projects, search, save, view
 from src.cli.context import IwadiContext
 
 
@@ -16,6 +16,7 @@ app.add_command(create_project.create, name="create-project")
 app.add_command(list_projects.list, name="list-projects")
 app.add_command(search.search, name="search")
 app.add_command(save.save_papers, name="save")
+app.add_command(view.view, name="view")
 
 if __name__ == "__main__":
     app()
